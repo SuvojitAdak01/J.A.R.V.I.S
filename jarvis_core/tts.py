@@ -7,8 +7,8 @@ def init_tts():
     try:
         engine = pyttsx3.init()
         voices = engine.getProperty('voices')
-        engine.setProperty('voice', voices[2].id)
-        engine.setProperty('rate', 200)
+        engine.setProperty('voice' , voices[3].id)
+        # engine.setProperty('rate', 210)
     except Exception as e:
         print(f"Error Initializing TTS engine: {e}")
         engine = None
@@ -28,4 +28,4 @@ init_tts()
 
 if __name__ == "__main__":
     speak("Hello, this is a test of the text to speech system")
-    speak("I should be able to speak this out loud")
+    speak("JARVIS version 2.0 online. How can I help you ?")
