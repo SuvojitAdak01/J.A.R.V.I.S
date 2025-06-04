@@ -59,11 +59,11 @@ def get_weather_action(location, unit_preference="celsius"):
             '%Y-%m-%d %I:%M:%S%p') if sunset_timestamp else "N/A"
 
         return (f"Temperature in {city_name} is: {temp}{unit_symbol}\n"
-                f"Temperature in {city_name} feels like: {feels_like}{unit_symbol}\n"
-                f"Humidity in {city_name} is {humidity}%\n"
-                f"General weather in {city_name}: {weather_desc}\n"
-                f"Sun risen in {city_name} at {sunrise_time}\n"
-                f"Sun will set in {city_name} at {sunset_time}")
+                f"Temperature feels like: {feels_like}{unit_symbol}\n"
+                f"Humidity is {humidity}%\n"
+                f"General weather : {weather_desc}\n"
+                f"Sun risen at {sunrise_time}\n"
+                f"Sun will set at {sunset_time}")
 
     except requests.exceptions.RequestException as e:
         print(f"Weather API request error: {e}")
