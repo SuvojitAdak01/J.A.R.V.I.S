@@ -13,3 +13,4 @@ logs/*.log
 *.log
 
 config/api_keys.json
+config/app_paths.json
