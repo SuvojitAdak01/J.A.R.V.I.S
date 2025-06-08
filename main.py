@@ -4,6 +4,7 @@ from jarvis_core import tts
 from jarvis_core import stt
 from jarvis_core.actions import system_ops
 from jarvis_core.actions import web_ops
+from jarvis_core.actions import math_ops
 from jarvis_core.nlp import processor
 from jarvis_core.nlp.processor import nlp as spacy_nlp_model
 
@@ -45,6 +46,13 @@ def initiate_get_weather(entities):
     return "Do you prefer Celsius or Fahrenheit?"
 
 
+def handle_calculation(entities):
+    expression = entities.get('expression')
+
+    if not expression:
+        return "I seem to have missed the calculation. What would you like me to compute?"
+
+    return math_ops.evaluate_expression(expression)
 
 action_handler = {
     "greet": lambda entities: "Hello Sir, How can I assist you today ?",
@@ -53,6 +61,7 @@ action_handler = {
     "exit": lambda entities: "Goodbye Sir, Have a pleasant day!",
     "get_weather": initiate_get_weather, # Defined in web_ops.py
     "search_wikipedia": web_ops.search_wikipedia_action, # And this one too
+    "calculate": handle_calculation,
     "unknown": lambda entities: "Sorry, I don't understand that command yet."
 }
 
