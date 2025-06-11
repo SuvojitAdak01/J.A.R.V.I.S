@@ -106,17 +106,63 @@ def process_text(text):
             entities['expression'] = _parse_math_query(text)
             return {'intent':intent, 'entities': entities}
 
-    if any(token.lemma_ in ["hello", "hi", "hey", "greetings"] for token in doc):
+    open_triggers = ["open", "launch", "go to", "navigate to"]
+    if any(text.lower().startswith(trigger) for trigger in open_triggers):
+        intent = "open_target"
+        for trigger in open_triggers:
+            if text.lower().startswith(trigger):
+                entities['target'] = text[len(trigger):].strip()
+                break  # Stop after finding the first trigger
+        return {'intent': intent, 'entities': entities}
+
+    close_triggers = ["close", "terminate", "exit", "shut down", "kill"]
+    if any(text.lower().startswith(trigger) for trigger in close_triggers):
+        # Avoid confusion with the main "exit" command for JARVIS itself
+        if len(text.lower().split()) > 1:
+            intent = "close_target"
+            for trigger in close_triggers:
+                if text.lower().startswith(trigger):
+                    entities['target'] = text[len(trigger):].strip()
+                    break
+            return {'intent': intent, 'entities': entities}
+
+    elif any(token.lemma_ in ["hello", "hi", "hey", "greetings"] for token in doc):
         intent = "greet"
+
+    elif any(word in text.lower() for word in ["increase volume", "volume up", "turn it up", "turn up"]):
+        intent = "increase_volume"
+        # Future Improvement: trying to extract a step number here in the future
+        return {'intent': intent, 'entities': {}}
+
+    elif any(word in text.lower() for word in ["decrease volume", "volume down", "turn it down", "turn down"]):
+        intent = "decrease_volume"
+        # Future Improvement: trying to extract a step number here in the future
+        return {'intent': intent, 'entities': {}}
+
+    elif any(word in text.lower() for word in ["mute", "unmute"]):
+        intent = "toggle_mute"
+        return {'intent': intent, 'entities': {}}
+
+    elif "set volume to" in text.lower() or "set the volume to" in text.lower():
+        intent = "set_volume"
+        # Find the number following the trigger phrase
+        found_level = [int(token.text) for token in doc if token.like_num]
+        if found_level:
+            entities['level'] = found_level[0]
+        return {'intent': intent, 'entities': entities}
+
     elif (any(token.lemma_ in ["what", "tell"] for token in doc) and
           any(token.lemma_ == "time" for token in doc) and
           not any(token.lemma_ == "date" for token in doc)):  # Avoid confusion with date
         intent = "get_time"
+
     elif (any(token.lemma_ in ["what", "tell"] for token in doc) and
           any(token.lemma_ == "date" for token in doc)):
         intent = "get_date"
+
     elif any(token.lemma_ in ["goodbye", "bye", "exit", "quit", "terminate"] for token in doc):
         intent = "exit"
+
     elif any(token.lemma_ == "weather" for token in doc):
         intent = "get_weather"
         # Basic entity extraction for location (looks for proper nouns, especially GPE - Geopolitical Entity)
@@ -140,6 +186,7 @@ def process_text(text):
                                                                                                                "for",
                                                                                                                "of"]:
                         entities['location'] = doc[token.i + 2].text
+
     elif (any(token.lemma_ in ["search", "wikipedia", "who is", "what is", "tell me about"] for token in doc) and
           not any(token.lemma_ == "weather" for token in doc)):  # Avoid clash with weather
         intent = "search_wikipedia"
