@@ -5,6 +5,8 @@ from jarvis_core import stt
 from jarvis_core.actions import system_ops
 from jarvis_core.actions import web_ops
 from jarvis_core.actions import math_ops
+from jarvis_core.actions import app_ops
+from jarvis_core.actions import system_control_ops
 from jarvis_core.nlp import processor
 from jarvis_core.nlp.processor import nlp as spacy_nlp_model
 
@@ -45,6 +47,11 @@ def initiate_get_weather(entities):
     }
     return "Do you prefer Celsius or Fahrenheit?"
 
+def handle_set_volume(entities):
+    level = entities.get('level')
+    if level is None:
+        return "I didn't catch the volume level. Please say something like 'set volume to 50'."
+    return system_control_ops.set_volume(level)
 
 def handle_calculation(entities):
     expression = entities.get('expression')
@@ -59,6 +66,12 @@ action_handler = {
     "get_time": lambda entities: system_ops.get_current_time(),
     "get_date": lambda entities: system_ops.get_current_date(),
     "exit": lambda entities: "Goodbye Sir, Have a pleasant day!",
+    "open_target": app_ops.open_target_action,
+    "close_target": app_ops.close_target_action,
+    "increase_volume": lambda entities: system_control_ops.increase_volume(),
+    "decrease_volume": lambda entities: system_control_ops.decrease_volume(),
+    "toggle_mute": lambda entities: system_control_ops.mute_unmute_volume(),
+    "set_volume": handle_set_volume,
     "get_weather": initiate_get_weather, # Defined in web_ops.py
     "search_wikipedia": web_ops.search_wikipedia_action, # And this one too
     "calculate": handle_calculation,
