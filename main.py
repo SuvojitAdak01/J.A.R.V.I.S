@@ -146,14 +146,14 @@ def handle_pending_conversation(command_text):
 
     return response
 
-def process_command_nlp_v2(command_text):
+def process_command_ml(command_text):
     global current_conversation_context
     pending_response = handle_pending_conversation(command_text)
 
     if pending_response:
         return pending_response
 
-    nlp_result = processor.process_text(command_text)
+    nlp_result = processor.process_text_ml(command_text)
     intent = nlp_result.get('intent')
     entities = nlp_result.get('entities', {})
 
@@ -177,7 +177,7 @@ def run_jarvis():
         command = stt.listen_for_command()
 
         if command:
-            response = process_command_nlp_v2(command)
+            response = process_command_ml(command)
             if response == "exit_signal":
                 break
             elif response:
