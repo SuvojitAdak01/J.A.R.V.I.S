@@ -1,0 +1,93 @@
+{
+  "intents": [
+    {
+      "tag": "greet",
+      "patterns": [
+        "hello", "hi there", "hey", "good morning", "good evening", "how are you", "is anyone there"
+      ]
+    },
+    {
+      "tag": "exit",
+      "patterns": [
+        "goodbye", "bye", "see you later", "terminate", "shut down", "exit", "quit", "I am leaving"
+      ]
+    },
+    {
+      "tag": "get_time",
+      "patterns": [
+        "what time is it", "tell me the current time", "what's the current time", "time please", "current time", "can you tell me the time"
+      ]
+    },
+    {
+      "tag": "get_date",
+      "patterns": [
+        "what's the date", "what is today's date", "tell me the date", "today's date please"
+      ]
+    },
+    {
+      "tag": "get_weather",
+      "patterns": [
+        "what is the weather like", "how's the weather in", "tell me the forecast for", "is it going to rain in", "weather please", "delhi weather report"
+      ]
+    },
+    {
+      "tag": "search_wikipedia",
+      "patterns": [
+        "who is Albert Einstein",
+        "what is quantum mechanics",
+        "search for the Eiffel Tower on wikipedia",
+        "tell me about the history of India",
+        "look up information about black holes",
+        "find me details on python programming"
+      ]
+    },
+    {
+      "tag": "calculate",
+      "patterns": [
+        "calculate 5 plus 7",
+        "compute 100 divided by 4",
+        "solve 15 times 3",
+        "evaluate 2 to the power of 8",
+        "5 multiplied by 10",
+        "10 minus 3",
+        "square root of 16"
+      ]
+    },
+    {
+      "tag": "open_target",
+      "patterns": [
+        "open my browser", "launch chrome", "go to google", "start notepad", "run calculator"
+      ]
+    },
+    {
+      "tag": "close_target",
+      "patterns": [
+        "close chrome", "terminate notepad", "kill the calculator app", "shut down the application"
+      ]
+    },
+    {
+      "tag": "increase_volume",
+      "patterns": [
+        "increase the volume", "volume up", "turn it up a bit", "make it louder"
+      ]
+    },
+    {
+      "tag": "decrease_volume",
+      "patterns": [
+        "decrease volume", "volume down", "turn the sound down", "make it quieter"
+      ]
+    },
+    {
+      "tag": "set_volume",
+      "patterns": [
+        "set volume to 80", "set the audio to 50 percent", "volume at 75"
+      ]
+    },
+    {
+      "tag": "toggle_mute",
+      "patterns": [
+        "mute the sound", "unmute the audio", "toggle mute state", "silence please"
+      ]
+    }
+  ]
+}
