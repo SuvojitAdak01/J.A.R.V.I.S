@@ -1,240 +1,75 @@
 import spacy
-import re
+from jarvis_core.ml.intent_classifier import IntentClassifier
 
 try:
     nlp = spacy.load("en_core_web_sm")
 except OSError:
-    print("Downloading en_core_web_sm model...")
+    print("Downloading spaCy model...")
     spacy.cli.download("en_core_web_sm")
     nlp = spacy.load("en_core_web_sm")
 
-def _parse_math_query(text):
-    replacements = {
-        # Powers & Roots (most specific first)
-        r"the (\d+)(?:st|nd|rd|th) root of": r"nth_root(",  # e.g., the 4th root of
-        r"cube root of": "cbrt(",
-        r"square root of": "sqrt(",
-        # Logarithms
-        r"natural log of": "ln(",
-        r"log of": "log10(",  # Default log to base 10
-        # Trigonometry (with degrees handling)
-        r"(?:sine|sin) of": "sin(radians(",
-        r"(?:cosine|cos) of": "cos(radians(",
-        r"(?:tangent|tan) of": "tan(radians(",
-        r"(?:arcsine|inverse sine|asin) of": "degrees(asin(",
-        r"(?:arccosine|inverse cosine|acos) of": "degrees(acos(",
-        r"(?:arctangent|inverse tangent|atan) of": "degrees(atan(",
-        # Other functions
-        r"factorial of": "factorial(",
-        # Basic arithmetic (words to symbols)
-        r" plus ": " + ",
-        r" minus ": " - ",
-        r" times ": " * ",
-        r" x ": " * ",
-        r" multiplied by ": " * ",
-        r" divided by ": " / ",
-        r" modulus ": " % ",
-        r" modulo ": " % ",
-        # Powers (words to symbols)
-        r" to the power of ": "**",
-        r" squared": "**2",
-        r" cubed": "**3",
-        # Constants
-        r"\bpi\b": "pi",
-        r"\be\b": "e",
-    }
+INTENT_CLASSIFIER = IntentClassifier()
+MODEL_LOADED = INTENT_CLASSIFIER.load_model('jarvis_core/ml/model')
 
-    processed_text = text.lower()
-
-    processed_text = re.sub(r'([\d\.]+) factorial', r'factorial(\1)', processed_text)
-
-    #Handling phrases like "log base 2 of 8"
-    log_base_match = re.search(r"log base ([\d\.]+) of ([\d\.]+)", processed_text)
-    if log_base_match:
-        base, number = log_base_match.groups()
-        processed_text = processed_text.replace(log_base_match.group(0), f"log({number}, {base})")
-
-    #Handling phrases like "the 4th root of 81"
-    nth_root_match = re.search(r"the ([\d\.]+)(?:st|nd|rd|th) root of ([\d\.]+)", processed_text)
-    if nth_root_match:
-        root, number = nth_root_match.groups()
-        processed_text = processed_text.replace(nth_root_match.group(0), f"nth_root({number}, {root})")
-
-    for pattern, replacement in replacements.items():
-        processed_text = re.sub(pattern, replacement, processed_text)
-
-    processed_text = processed_text.replace(" degrees", ")")
-
-    open_paren = processed_text.count('(')
-    close_paren = processed_text.count(')')
-    if open_paren > close_paren:
-        processed_text += ')' * (open_paren - close_paren)
-
-    # Clean up: remove words that are not part of the expression
-    # Words like "what", "is", "calculate", "compute", "tell", "me", "the"
-    cleanup_words = ["what's", "what is", "whats", "calculate", "compute", "the result of", "tell me", "of", "how much is"]
-    for word in cleanup_words:
-        processed_text = processed_text.replace(word, "")
-
-    final_expression = re.sub(r"[^a-z0-9\s\.\+\-\*\/\%\(\)\,]", "", processed_text).strip()
-
-    return final_expression
-
-def process_text(text):
+def extract_entities(doc, intent):
     """
-        Processes text to extract intent and entities.
-        For now, we'll use rule-based intent recognition.
-        Returns a dictionary like: {'intent': 'some_intent', 'entities': {'entity_name': 'value'}}
+    Extracts entities based on the predicted intent.
+    This part remains rule-based for now, but is much simpler.
     """
-
-    doc = nlp(text.lower())
-    intent = None
     entities = {}
 
-    calculation_triggers = ["calculate", "compute", "what is", "what's", "result of"]
-    has_number = any(token.like_num for token in doc)
-    mathy_words = ["plus", "minus", "times", "divided", "root", "power", "log", "sin", "cos", "tan", "factorial"]
-    mathy_symbols = ['+', '-', '*', '/', 'x']
+    for ent in doc.ents:
+        if ent.label_ == "GPE":  # Geopolitical Entity (cities, countries)
+            entities['location'] = ent.text
+        elif ent.label_ == "PERSON":
+            # If the intent is about searching, the person is likely the query
+            if intent == 'search_wikipedia':
+                entities['query'] = ent.text
+        elif ent.label_ == "CARDINAL" or ent.label_ == "QUANTITY":
+            # Extracting numbers for volume control
+            if intent == 'set_volume':
+                try:
+                    entities['level'] = int(ent.text)
+                except ValueError:
+                    pass
 
-    has_mathy_word = any(token.lemma_ in mathy_words for token in doc)
-    has_mathy_symbol = any(symbol in text for symbol in mathy_symbols)
-    has_trigger_phrase = any(trigger in text.lower() for trigger in calculation_triggers)
-
-    if (has_trigger_phrase and has_number) or (has_number and (has_mathy_word or has_mathy_symbol)):
-        if "time" not in text.lower() and "date" not in text.lower() and "weather" not in text.lower():
-            intent = "calculate"
-            entities['expression'] = _parse_math_query(text)
-            return {'intent':intent, 'entities': entities}
-
-    open_triggers = ["open", "launch", "go to", "navigate to"]
-    if any(text.lower().startswith(trigger) for trigger in open_triggers):
-        intent = "open_target"
-        for trigger in open_triggers:
-            if text.lower().startswith(trigger):
-                entities['target'] = text[len(trigger):].strip()
-                break  # Stop after finding the first trigger
-        return {'intent': intent, 'entities': entities}
-
-    close_triggers = ["close", "terminate", "exit", "shut down", "kill"]
-    if any(text.lower().startswith(trigger) for trigger in close_triggers):
-        # Avoid confusion with the main "exit" command for JARVIS itself
-        if len(text.lower().split()) > 1:
-            intent = "close_target"
-            for trigger in close_triggers:
-                if text.lower().startswith(trigger):
-                    entities['target'] = text[len(trigger):].strip()
-                    break
-            return {'intent': intent, 'entities': entities}
-
-    elif any(token.lemma_ in ["hello", "hi", "hey", "greetings"] for token in doc):
-        intent = "greet"
-
-    elif any(word in text.lower() for word in ["increase volume", "volume up", "turn it up", "turn up"]):
-        intent = "increase_volume"
-        # Future Improvement: trying to extract a step number here in the future
-        return {'intent': intent, 'entities': {}}
-
-    elif any(word in text.lower() for word in ["decrease volume", "volume down", "turn it down", "turn down"]):
-        intent = "decrease_volume"
-        # Future Improvement: trying to extract a step number here in the future
-        return {'intent': intent, 'entities': {}}
-
-    elif any(word in text.lower() for word in ["mute", "unmute"]):
-        intent = "toggle_mute"
-        return {'intent': intent, 'entities': {}}
-
-    elif "set volume to" in text.lower() or "set the volume to" in text.lower():
-        intent = "set_volume"
-        # Find the number following the trigger phrase
-        found_level = [int(token.text) for token in doc if token.like_num]
-        if found_level:
-            entities['level'] = found_level[0]
-        return {'intent': intent, 'entities': entities}
-
-    elif (any(token.lemma_ in ["what", "tell"] for token in doc) and
-          any(token.lemma_ == "time" for token in doc) and
-          not any(token.lemma_ == "date" for token in doc)):  # Avoid confusion with date
-        intent = "get_time"
-
-    elif (any(token.lemma_ in ["what", "tell"] for token in doc) and
-          any(token.lemma_ == "date" for token in doc)):
-        intent = "get_date"
-
-    elif any(token.lemma_ in ["goodbye", "bye", "exit", "quit", "terminate"] for token in doc):
-        intent = "exit"
-
-    elif any(token.lemma_ == "weather" for token in doc):
-        intent = "get_weather"
-        # Basic entity extraction for location (looks for proper nouns, especially GPE - Geopolitical Entity)
-        for ent in doc.ents:
-            if ent.label_ == "GPE":  # Geopolitical entity (cities, countries)
-                entities['location'] = ent.text
+    # Custom extraction for things spaCy's NER might miss
+    if intent in ['open_target', 'close_target']:
+        for token in doc:
+            if token.pos_ == "VERB":
+                entities['target'] = doc[token.i + 1:].text.strip()
                 break
-        if not entities.get('location'):
-            # Fallback: if no GPE, look for nouns after "in", "for", "of" near "weather"
-            for token in doc:
-                if token.lemma_ == "weather":
-                    # Check tokens after "weather in/for/of LOCATION"
-                    children = [child for child in token.children if child.dep_ in ("prep", "pobj")]
-                    for child_prep in children:  # e.g. "in"
-                        for child_loc in child_prep.children:  # e.g. "london"
-                            if child_loc.pos_ == "PROPN" or child_loc.pos_ == "NOUN":
-                                entities['location'] = child_loc.text
-                                break
-                        if entities.get('location'): break
-                    if not entities.get('location') and token.i + 2 < len(doc) and doc[token.i + 1].lemma_ in ["in",
-                                                                                                               "for",
-                                                                                                               "of"]:
-                        entities['location'] = doc[token.i + 2].text
 
-    elif (any(token.lemma_ in ["search", "wikipedia", "who is", "what is", "tell me about"] for token in doc) and
-          not any(token.lemma_ == "weather" for token in doc)):  # Avoid clash with weather
-        intent = "search_wikipedia"
-        # Extract the search query (rudimentary: take text after the trigger phrase)
-        # A more robust way would be to identify the main noun phrase.
-        trigger_phrases = ["search wikipedia for", "wikipedia", "search for", "who is", "what is", "tell me about"]
-        query_parts = []
-        text_to_search = text.lower()
-        found_trigger = False
-        for phrase in trigger_phrases:
-            if phrase in text_to_search:
-                # Take the part after the phrase
-                query_parts = text_to_search.split(phrase, 1)[-1].strip().split()
-                found_trigger = True
-                break
-        if not found_trigger:  # if no specific trigger, take significant nouns/proper nouns
-            query_parts = [token.text for token in doc if
-                           token.pos_ in ["PROPN", "NOUN", "ADJ"] and token.lemma_ not in ["search", "wikipedia",
-                                                                                           "tell", "me", "about"]]
+    if intent == 'search_wikipedia' and not entities.get('query'):
+        # Fallback for search query
+        non_verb_tokens = [token.text for token in doc if token.pos_ not in ['VERB', 'AUX']]
+        if len(non_verb_tokens) > 1:
+            entities['query'] = " ".join(non_verb_tokens[1:])  # a simple fallback
 
-        if query_parts:
-            entities['query'] = " ".join(query_parts)
-        elif len(doc) > 2:  # Fallback if specific triggers aren't clear
-            entities['query'] = " ".join([token.text for token in doc[2:]])
+    return entities
 
-    if not intent and len(doc) > 0:  # If no specific intent was matched
-        intent = "unknown"  # Default fallback intent
 
-    print(f" Text='{text}', Intent='{intent}', Entities='{entities}'")  # Debug print
+def process_text_ml(text):
+    """
+    Processes text using a trained ML model for intent and spaCy for entities.
+    """
+    if not MODEL_LOADED:
+        return {'intent': 'model_error', 'entities': {}}
+
+    # 1. Predicting the intent using our ML model
+    intent = INTENT_CLASSIFIER.predict(text)
+
+    # 2. Using spaCy to process the text for entity extraction
+    doc = nlp(text)
+
+    # 3. Extracting entities based on the predicted intent
+    entities = extract_entities(doc, intent)
+
+    # Special case: calculation. The whole text is the expression.
+    if intent == 'calculate':
+
+        from ._math_parser import parse_math_query  # We will create this helper file
+        entities['expression'] = parse_math_query(text)
+
+    print(f"ML NLP Debug: Text='{text}', Intent='{intent}', Entities='{entities}'")
     return {'intent': intent, 'entities': entities}
-
-if __name__ == "__main__":
-    tests = [
-        "Hello JARVIS",
-        "what is the time?",
-        "tell me the current date",
-        "what's the weather like in London",
-        "weather in Mumbai please",
-        "search Wikipedia for Python programming",
-        "who is Albert Einstein",
-        "tell me about the Eiffel Tower",
-        "goodbye",
-        "this is some random unrecognized command"
-    ]
-
-    for test_txt in tests:
-        result = process_text(test_txt)
-        print(f"Input: '{test_txt}' -> Intent: {result['intent']}, Entities: {result['entities']}")
-
-    result = process_text("what is the current weather for New Delhi")
-    print(f"Input: 'what is the current weather for New Delhi' -> Intent: {result['intent']}, Entities: {result['entities']}")
