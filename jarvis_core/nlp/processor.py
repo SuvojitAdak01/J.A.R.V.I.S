@@ -17,34 +17,45 @@ def extract_entities(doc, intent):
     This part remains rule-based for now, but is much simpler.
     """
     entities = {}
+    text = doc.text.lower()
+
+    if intent in ['open_target', 'close_target']:
+        open_triggers = ["open", "launch", "go to", "start", "run", "i want to open", "can you launch", "can you open"]
+        close_triggers = ["close", "terminate", "kill", "shut down", "please close", "exit"]
+
+        triggers = open_triggers if intent == 'open_target' else close_triggers
+
+        for trigger in triggers:
+            if text.startswith(trigger):
+                target = text[len(trigger):].strip()
+                if target.lower().endswith(("app", "application", "browser")):
+                    target = target.rsplit(' ', 1)[0].strip()
+                entities['target'] = target
+                break
+        return entities
 
     for ent in doc.ents:
-        if ent.label_ == "GPE":  # Geopolitical Entity (cities, countries)
+        if ent.label_ == "GPE" and intent == "get_weather":
             entities['location'] = ent.text
-        elif ent.label_ == "PERSON":
-            # If the intent is about searching, the person is likely the query
-            if intent == 'search_wikipedia':
+        elif ent.label_ == "PERSON" and intent == "search_wikipedia":
+            if 'query' not in entities:
                 entities['query'] = ent.text
         elif ent.label_ == "CARDINAL" or ent.label_ == "QUANTITY":
-            # Extracting numbers for volume control
-            if intent == 'set_volume':
+            if intent == 'set_volume' and 'level' not in entities:
                 try:
-                    entities['level'] = int(ent.text)
-                except ValueError:
+                    entities['level'] = int(ent.text.split(' ')[0])
+                except (ValueError, IndexError):
                     pass
 
-    # Custom extraction for things spaCy's NER might miss
-    if intent in ['open_target', 'close_target']:
-        for token in doc:
-            if token.pos_ == "VERB":
-                entities['target'] = doc[token.i + 1:].text.strip()
-                break
-
-    if intent == 'search_wikipedia' and not entities.get('query'):
-        # Fallback for search query
-        non_verb_tokens = [token.text for token in doc if token.pos_ not in ['VERB', 'AUX']]
-        if len(non_verb_tokens) > 1:
-            entities['query'] = " ".join(non_verb_tokens[1:])  # a simple fallback
+    if intent == 'search_wikipedia' and 'query' not in entities:
+        if doc.noun_chunks:
+            relevant_chunks = [chunk for chunk in doc.noun_chunks if chunk.root.pos_ != 'PRON']
+            if relevant_chunks:
+                query = relevant_chunks[-1].text.strip()
+                if query.lower().startswith(('a ', 'an ', 'the ')):
+                    entities['query'] = query.split(' ', 1)[1]
+                else:
+                    entities['query'] = query
 
     return entities
 
