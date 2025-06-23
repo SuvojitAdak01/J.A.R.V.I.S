@@ -13,12 +13,14 @@ if __name__ == '__main__':
 
     print("\n--- Testing Model ---")
     tests = [
+        "Hey Jarvis",
         "what's the time",
         "weather in Mumbai",
         "open up my calculator",
         "who is shah rukh khan",
         "5 times 10",
-        "turn the sound down"
+        "turn the sound down",
+        "that's all for now Jarvis"
     ]
     for test in tests:
         intent = classifier.predict(test)
