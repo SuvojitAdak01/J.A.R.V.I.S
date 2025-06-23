@@ -25,7 +25,7 @@ J.A.R.V.I.S. is currently equipped with a Machine Learning-based intent classifi
 
 ## 🛠️ Getting Started
 
-Follow these instructions to get a copy of J.A.R.V.I.S. running on your local machine.
+Follow these steps to get a copy of J.A.R.V.I.S. running on your local machine.
 
 ### Prerequisites
 
@@ -39,7 +39,7 @@ Follow these instructions to get a copy of J.A.R.V.I.S. running on your local ma
 1.  **Clone the Repository**
     Open your terminal or command prompt and run:
     ```bash
-    git clone <your-github-repository-url>
+    git clone https://github.com/SuvojitAdak01/J.A.R.V.I.S.git
     cd J.A.R.V.I.S
     ```
 
@@ -60,7 +60,7 @@ Follow these instructions to get a copy of J.A.R.V.I.S. running on your local ma
     ```bash
     pip install -r requirements.txt
     ```
-    This will install `SpeechRecognition`, `pyttsx3`, `PyAudio`, `scikit-learn`, `joblib`, `spaCy`, and other necessary packages. It will also download the `en_core_web_sm` model for spaCy.
+    This will install all the necessary packages. It will also download the `en_core_web_sm` model for spaCy.
 
 4.  **Configure API Keys and Paths**
     Some features require configuration.
