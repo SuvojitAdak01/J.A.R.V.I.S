@@ -30,30 +30,39 @@ def open_target_action(entities):
 
     target_lower = target_name.lower()
     os_name = platform.system().lower()
+    os_apps = APP_PATHS.get(os_name, {})
 
-    if os_name in APP_PATHS and target_lower in APP_PATHS[os_name]:
-        if target_lower in RUNNING_PROCESSES and RUNNING_PROCESSES[target_lower].poll() is None:
+    app_key_to_open = None
+
+    if target_lower in os_apps:
+        app_key_to_open = target_lower
+    else:
+        for key in os_apps.keys():
+            if key in target_lower:
+                app_key_to_open = key
+                break
+
+    if app_key_to_open:
+        if app_key_to_open in RUNNING_PROCESSES and RUNNING_PROCESSES[app_key_to_open].poll() is None:
             return f"{target_name} is already running under my supervision."
 
-        app_path = APP_PATHS[os_name][target_lower]
+        app_path = os_apps[app_key_to_open]
         try:
-            print(f"DEBUG: Launching '{app_path}'")
+            print(f"DEBUG: Match found. Key: '{app_key_to_open}', Path: '{app_path}'")
             proc = subprocess.Popen(app_path)
-            RUNNING_PROCESSES[target_lower] = proc
+            RUNNING_PROCESSES[app_key_to_open] = proc
             return f"Opening {target_name}."
         except Exception as e:
             print(f"Error opening application '{target_name}': {e}")
             return f"Sorry, I encountered an error trying to open {target_name}."
 
+    # --- Fallback to website/search logic (no changes here) ---
     website_indicators = ['.com', '.org', '.net', '.in', '.io', '.co', '.edu', '.gov']
     known_websites = {
-        "google": "https://www.google.com",
-        "youtube": "https://www.youtube.com",
-        "wikipedia": "https://www.wikipedia.org",
-        "github": "https://www.github.com",
+        "google": "https://www.google.com", "youtube": "https://www.youtube.com",
+        "wikipedia": "https://www.wikipedia.org", "github": "https://www.github.com",
         "amazon": "https://www.amazon.in"
     }
-
     if target_lower in known_websites:
         url = known_websites[target_lower]
     elif any(indicator in target_lower for indicator in website_indicators):
@@ -62,7 +71,7 @@ def open_target_action(entities):
         url = f"https://www.google.com/search?q={target_name}"
         try:
             webbrowser.open(url, new=2)
-            return f"I couldn't find an application or website for '{target_name}', so I'm searching for it on Google."
+            return f"I couldn't find a configured application or website for '{target_name}', so I'm searching for it."
         except Exception as e:
             print(f"Error opening web browser: {e}")
             return "Sorry, I couldn't open the web browser to search."
