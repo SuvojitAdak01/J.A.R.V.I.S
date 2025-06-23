@@ -1,74 +1,89 @@
-import re
+import spacy
+
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    spacy.cli.download("en_core_web_sm")
+    nlp = spacy.load("en_core_web_sm")
+
 
 def parse_math_query(text):
-    replacements = {
-        # Powers & Roots (most specific first)
-        r"the (\d+)(?:st|nd|rd|th) root of": r"nth_root(",  # e.g., the 4th root of
-        r"cube root of": "cbrt(",
-        r"square root of": "sqrt(",
-        # Logarithms
-        r"natural log of": "ln(",
-        r"log of": "log10(",  # Default log to base 10
-        # Trigonometry (with degrees handling)
-        r"(?:sine|sin) of": "sin(radians(",
-        r"(?:cosine|cos) of": "cos(radians(",
-        r"(?:tangent|tan) of": "tan(radians(",
-        r"(?:arcsine|inverse sine|asin) of": "degrees(asin(",
-        r"(?:arccosine|inverse cosine|acos) of": "degrees(acos(",
-        r"(?:arctangent|inverse tangent|atan) of": "degrees(atan(",
-        # Other functions
-        r"factorial of": "factorial(",
-        # Basic arithmetic (words to symbols)
-        r" plus ": " + ",
-        r" minus ": " - ",
-        r" times ": " * ",
-        r" x ": " * ",
-        r" multiplied by ": " * ",
-        r" divided by ": " / ",
-        r" modulus ": " % ",
-        r" modulo ": " % ",
-        # Powers (words to symbols)
-        r" to the power of ": "**",
-        r" squared": "**2",
-        r" cubed": "**3",
-        # Constants
-        r"\bpi\b": "pi",
-        r"\be\b": "e",
+    """
+    A more robust, token-based parser for math queries.
+    """
+    op_map = {
+        "plus": "+", "add": "+",
+        "minus": "-", "subtract": "-", "less": "-",
+        "times": "*", "multiplied by": "*", "x": "*",
+        "divided by": "/", "over": "/",
+        "power": "**", "raised to": "**"
     }
+    func_map = {
+        "square root": "sqrt", "sqrt": "sqrt",
+        "cube root": "cbrt",
+        "log": "log10", "logarithm": "log10",
+        "natural log": "ln", "ln": "ln",
+        "sine": "sin", "sin": "sin",
+        "cosine": "cos", "cos": "cos",
+        "tangent": "tan", "tan": "tan",
+        "arcsine": "asin", "inverse sine": "asin",
+        "arccosine": "acos", "inverse cosine": "acos",
+        "arctangent": "atan", "inverse tangent": "atan",
+        "factorial": "factorial"
+    }
+    trig_funcs = {"sin", "cos", "tan"}
+    inv_trig_funcs = {"asin", "acos", "atan"}
 
-    processed_text = text.lower()
+    doc = nlp(text.lower())
+    parts = []
+    i = 0
+    while i < len(doc):
+        token = doc[i]
 
-    processed_text = re.sub(r'([\d\.]+) factorial', r'factorial(\1)', processed_text)
+        # To handle numbers
+        if token.like_num:
+            parts.append(token.text)
+        # To handle operators
+        elif token.text in op_map:
+            parts.append(op_map[token.text])
+        # To handle multi-word functions like "square root"
+        elif i + 1 < len(doc) and f"{token.text} {doc[i + 1].text}" in func_map:
+            func = func_map[f"{token.text} {doc[i + 1].text}"]
+            parts.append(func + "(")
+            i += 1  # Skip next token
+        # To handle single-word functions
+        elif token.text in func_map:
+            func = func_map[token.text]
+            parts.append(func + "(")
 
-    # Handling phrases like "log base 2 of 8"
-    log_base_match = re.search(r"log base ([\d\.]+) of ([\d\.]+)", processed_text)
-    if log_base_match:
-        base, number = log_base_match.groups()
-        processed_text = processed_text.replace(log_base_match.group(0), f"log({number}, {base})")
+        i += 1
 
-    # Handling phrases like "the 4th root of 81"
-    nth_root_match = re.search(r"the ([\d\.]+)(?:st|nd|rd|th) root of ([\d\.]+)", processed_text)
-    if nth_root_match:
-        root, number = nth_root_match.groups()
-        processed_text = processed_text.replace(nth_root_match.group(0), f"nth_root({number}, {root})")
-
-    for pattern, replacement in replacements.items():
-        processed_text = re.sub(pattern, replacement, processed_text)
-
-    processed_text = processed_text.replace(" degrees", ")")
-
-    open_paren = processed_text.count('(')
-    close_paren = processed_text.count(')')
+    # Simple logic to balance parentheses
+    expression = " ".join(parts)
+    open_paren = expression.count('(')
+    close_paren = expression.count(')')
     if open_paren > close_paren:
-        processed_text += ')' * (open_paren - close_paren)
+        expression += ' )' * (open_paren - close_paren)
 
-    # Clean up: remove words that are not part of the expression
-    # Words like "what", "is", "calculate", "compute", "tell", "me", "the"
-    cleanup_words = ["what's", "what is", "whats", "calculate", "compute", "the result of", "tell me", "of",
-                     "how much is"]
-    for word in cleanup_words:
-        processed_text = processed_text.replace(word, "")
+    # Special handling for trig degrees
+    final_expr = []
+    tokens = expression.split()
+    skip_next = False
+    for i, token in enumerate(tokens):
+        if skip_next:
+            skip_next = False
+            continue
 
-    final_expression = re.sub(r"[^a-z0-9\s\.\+\-\*\/\%\(\)\,]", "", processed_text).strip()
+        # Checking if a trig function needs radians() wrapper
+        func_name = token.replace('(', '')
+        if func_name in trig_funcs and i + 1 < len(tokens):
+            final_expr.append(f"{func_name}(radians({tokens[i + 1]}))")
+            skip_next = True  # Skip the number token as we've consumed it
+        # Checking if an inverse trig function needs degrees() wrapper
+        elif func_name in inv_trig_funcs and i + 1 < len(tokens):
+            final_expr.append(f"degrees({func_name}({tokens[i + 1]}))")
+            skip_next = True
+        else:
+            final_expr.append(token)
 
-    return final_expression
+    return " ".join(final_expr).replace(" )", ")")
